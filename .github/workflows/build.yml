@@ -1,34 +1,48 @@
-name: Build redsocks
+name: Build redsocks for Android (ARM64)
 
 on:
   push:
     branches: [ main, master ]
-  pull_request:
-    branches: [ main, master ]
   workflow_dispatch:
 
 jobs:
-  build:
+  build-android:
     runs-on: ubuntu-latest
 
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Install dependencies
+    # 1. 安装 Android NDK
+    - name: Setup Android NDK
+      uses: nttld/setup-ndk@v1
+      with:
+        ndk-version: r25c  # 建议使用较新的 LTS 版本，如 r25c 或 r26b
+        add-to-path: true
+
+    # 2. 编译依赖库 (libevent 等)
+    # 注意：redsocks 的构建可能需要先编译依赖，这里使用一个简化的占位脚本。
+    # 实际应用中，你可能需要参照 shadowssocks-android 的 jni 目录结构来组织源码。
+    - name: Build dependencies and redsocks
       run: |
-        sudo apt-get update
-        sudo apt-get install -y build-essential libevent-dev libssl-dev libxtables-dev pkg-config libnetfilter-conntrack-dev
+        # 设置 NDK 环境变量
+        export ANDROID_NDK_HOME=$ANDROID_NDK_HOME
+        export PATH=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin:$PATH
 
-    - name: Build with make
-      run: make
+        # 示例：使用 ndk-build 进行编译。
+        # 你需要一个 Android.mk 文件来告诉 ndk-build 如何编译 redsocks。
+        # 可以从 shadowsocks-android 项目的 jni 目录中获取参考配置。
+        # ndk-build NDK_PROJECT_PATH=. APP_BUILD_SCRIPT=./Android.mk APP_ABI=arm64-v8a
 
-    - name: Verify binary
-      run: ls -l redsocks
+        # 如果使用传统的 Makefile，则需要配置 CC 和 CXX 等环境变量指向 NDK 的 clang。
+        # 例如：
+        # export CC=aarch64-linux-android21-clang
+        # export CXX=aarch64-linux-android21-clang++
+        # make
 
-    # 新增步骤：将编译好的文件上传
+    # 3. 上传编译产物
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
-        name: redsocks-binary
-        path: redsocks
+        name: redsocks-android-arm64
+        path: ./libs/arm64-v8a/redsocks  # 路径取决于你的构建方式
