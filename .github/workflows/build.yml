@@ -24,3 +24,9 @@ jobs:
 
     - name: Verify binary
       run: ls -l redsocks
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:  # 添加这一行，开启手动触发按钮
