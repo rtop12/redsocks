@@ -1,0 +1,30 @@
+name: Build redsocks
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    # 1. 拉取仓库代码
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    # 2. 安装 redsocks 所需的系统依赖
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential libevent-dev libssl-dev
+
+    # 3. 执行编译
+    - name: Build with make
+      run: make
+
+    # 4. 验证编译产物是否存在
+    - name: Verify binary
+      run: ls -l redsocks
