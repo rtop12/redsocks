@@ -11,20 +11,16 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    # 1. 拉取仓库代码
     - name: Checkout code
       uses: actions/checkout@v4
 
-    # 2. 安装 redsocks 所需的系统依赖
     - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y build-essential libevent-dev libssl-dev
+        sudo apt-get install -y build-essential libevent-dev libssl-dev iptables-dev
 
-    # 3. 执行编译
     - name: Build with make
-      run: make
+      run: make redsocks
 
-    # 4. 验证编译产物是否存在
     - name: Verify binary
       run: ls -l redsocks
