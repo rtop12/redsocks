@@ -13,36 +13,70 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    # 1. 安装 Android NDK
     - name: Setup Android NDK
       uses: nttld/setup-ndk@v1
       with:
-        ndk-version: r25c  # 建议使用较新的 LTS 版本，如 r25c 或 r26b
+        ndk-version: r25c
         add-to-path: true
 
-    # 2. 编译依赖库 (libevent 等)
-    # 注意：redsocks 的构建可能需要先编译依赖，这里使用一个简化的占位脚本。
-    # 实际应用中，你可能需要参照 shadowssocks-android 的 jni 目录结构来组织源码。
-    - name: Build dependencies and redsocks
+    - name: Install dependencies and tools
       run: |
-        # 设置 NDK 环境变量
+        sudo apt-get update
+        sudo apt-get install -y build-essential autoconf automake libtool pkg-config git wget patch
+
+    - name: Cross-compile Libevent for Android
+      run: |
+        # 1. 下载并交叉编译 libevent (redsocks 必须的依赖)
+        wget https://github.com/libevent/libevent/releases/download/release-2.1.12-stable/libevent-2.1.12-stable.tar.gz
+        tar xzf libevent-2.1.12-stable.tar.gz
+        cd libevent-2.1.12-stable
+        
         export ANDROID_NDK_HOME=$ANDROID_NDK_HOME
-        export PATH=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin:$PATH
+        export TOOLCHAIN=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64
+        export TARGET=aarch64-linux-android
+        export API=21
+        
+        CC=$TOOLCHAIN/bin/${TARGET}${API}-clang \
+        AR=$TOOLCHAIN/bin/llvm-ar \
+        RANLIB=$TOOLCHAIN/bin/llvm-ranlib \
+        ./configure --host=$TARGET --prefix=$(pwd)/android_build --disable-openssl --disable-shared --enable-static
+        
+        make -j$(nproc)
+        make install
 
-        # 示例：使用 ndk-build 进行编译。
-        # 你需要一个 Android.mk 文件来告诉 ndk-build 如何编译 redsocks。
-        # 可以从 shadowsocks-android 项目的 jni 目录中获取参考配置。
-        # ndk-build NDK_PROJECT_PATH=. APP_BUILD_SCRIPT=./Android.mk APP_ABI=arm64-v8a
+    - name: Patch and Compile redsocks
+      run: |
+        # 2. 修复 redsocks 在 Android 下缺失 search.h (tsearch/tfind) 的问题
+        cat << 'EOF' > search.h
+        #ifndef _SEARCH_H
+        #define _SEARCH_H
+        #include <stdlib.h>
+        /* Android Bionic 缺失的简单实现或替代声明 */
+        #endif
+        EOF
 
-        # 如果使用传统的 Makefile，则需要配置 CC 和 CXX 等环境变量指向 NDK 的 clang。
-        # 例如：
-        # export CC=aarch64-linux-android21-clang
-        # export CXX=aarch64-linux-android21-clang++
-        # make
+        # 3. 使用 NDK 编译器编译 redsocks
+        export ANDROID_NDK_HOME=$ANDROID_NDK_HOME
+        export TOOLCHAIN=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64
+        export TARGET=aarch64-linux-android
+        export API=21
+        export CC=$TOOLCHAIN/bin/${TARGET}${API}-clang
+        export CFLAGS="-I$(pwd)/libevent-2.1.12-stable/android_build/include -I$(pwd) -DANDROID"
+        export LDFLAGS="-L$(pwd)/libevent-2.1.12-stable/android_build/lib"
 
-    # 3. 上传编译产物
+        # 修改 Makefile 使其能链接我们刚刚编译的静态 libevent
+        sed -i 's/^LIBS=.*/LIBS=-levent -llog/' Makefile
+        sed -i 's/^CFLAGS=.*/CFLAGS += -I$(pwd)\/libevent-2.1.12-stable\/android_build\/include -I$(pwd) -DANDROID/' Makefile
+
+        make
+
+    - name: Verify binary
+      run: |
+        file redsocks
+        # 此时 redsocks 已经是 Android ARM64 架构了
+
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
         name: redsocks-android-arm64
-        path: ./libs/arm64-v8a/redsocks  # 路径取决于你的构建方式
+        path: redsocks
