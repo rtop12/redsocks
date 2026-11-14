@@ -5,7 +5,7 @@ on:
     branches: [ main, master ]
   pull_request:
     branches: [ main, master ]
-  workflow_dispatch:  # 允许在网页端手动点击触发
+  workflow_dispatch:
 
 jobs:
   build:
@@ -18,13 +18,17 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt-get update
-        # 替换了废弃的 iptables-dev，并添加了 pkg-config 等必要构建工具
         sudo apt-get install -y build-essential libevent-dev libssl-dev libxtables-dev pkg-config libnetfilter-conntrack-dev
 
     - name: Build with make
       run: make
 
     - name: Verify binary
-      run: |
-        ls -l redsocks
-        echo "编译成功！二进制文件已生成。"
+      run: ls -l redsocks
+
+    # 新增步骤：将编译好的文件上传
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: redsocks-binary
+        path: redsocks
