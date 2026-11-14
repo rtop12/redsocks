@@ -2,10 +2,10 @@ name: Build redsocks
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, master ]
   pull_request:
-    branches: [ main ]
-  workflow_dispatch:  # 手动触发按钮
+    branches: [ main, master ]
+  workflow_dispatch:  # 允许在网页端手动点击触发
 
 jobs:
   build:
@@ -18,10 +18,13 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y build-essential libevent-dev libssl-dev iptables-dev
+        # 替换了废弃的 iptables-dev，并添加了 pkg-config 等必要构建工具
+        sudo apt-get install -y build-essential libevent-dev libssl-dev libxtables-dev pkg-config libnetfilter-conntrack-dev
 
     - name: Build with make
       run: make
 
     - name: Verify binary
-      run: ls -l redsocks
+      run: |
+        ls -l redsocks
+        echo "编译成功！二进制文件已生成。"
